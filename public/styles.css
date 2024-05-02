@@ -1,0 +1,102 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+:root {
+  --primary-color: #005A8D;
+  --secondary-color: #E1E1E1;
+  --accent-color: #F4B400;
+  --font-stack: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  --font-color: #333;
+  --background-color: #FFF;
+  --error-color: #D32F2F;
+  --success-color: #388E3C;
+  --info-color: #1976D2;
+}
+body {
+  font-family: var(--font-stack);
+  color: var(--font-color);
+  background-color: var(--background-color);
+  line-height: 1.6;
+  padding: 20px;
+}
+h1, h2, h3, h4, h5, h6 {
+  margin-bottom: 15px;
+}
+a {
+  color: var(--primary-color);
+  text-decoration: none;
+}
+.container {
+  max-width: 1200px;
+  margin: auto;
+  overflow: hidden;
+  padding: 0 20px;
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  margin: -10px;
+}
+.col {
+  flex: 1;
+  padding: 10px;
+}
+.header {
+  background: var(--primary-color);
+  color: #fff;
+  padding: 20px 0;
+  text-align: center;
+}
+button,
+input[type="submit"],
+input[type="button"] {
+  background: var(--primary-color);
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  cursor: pointer;
+  margin-top: 10px;
+}
+button:hover,
+input[type="submit"]:hover,
+input[type="button"]:hover {
+  background: darken(var(--primary-color), 10%);
+}
+.form-group {
+  margin-bottom: 15px;
+}
+.form-control {
+  width: 100%;
+  padding: 10px;
+  margin: 5px 0;
+  border-radius: 5px;
+  border: 1px solid var(--secondary-color);
+}
+.text-center {
+  text-align: center;
+}
+.text-error {
+  color: var(--error-color);
+}
+.text-success {
+  color: var(--success-color);
+}
+[aria-hidden="true"] {
+  visibility: hidden;
+}
+:focus {
+  outline: 3px solid var(--accent-color);
+  outline-offset: 2px;
+}
+@media screen and (max-width: 768px) {
+  .row {
+    flex-direction: column;
+  }
+  .header {
+    padding: 15px 0;
+  }
+}
