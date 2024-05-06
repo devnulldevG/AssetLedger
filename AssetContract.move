@@ -18,7 +18,11 @@ address 0x1 {
             next_id: u64,
         }
 
-        public fun register_new_asset(owner: &signer, name: vector<u8>) {
+        struct Error {
+            code: u64,
+        }
+
+        public fun register_new_asset(owner: &signer, name: vector<u8>): Option<Error> {
             let asset_id = get_next_asset_id();
             let asset = Asset {
                 name,
@@ -26,27 +30,36 @@ address 0x1 {
                 owner: signer::address_of(owner),
             };
             add_asset_to_owner(owner, asset);
+            None
         }
 
-        public fun transfer_asset(from: &signer, to: address, asset_id: u64) {
+        public fun transfer_asset(from: &signer, to: address, asset_id: u64): Option<Error> {
             let from_address = signer::address_of(from);
-            // Assert that the `AssetsOwned` resource exists for the sender
-            assert!(exists<AssetsOwned>(from_address), 403, "Sender does not own any assets.");
-            let asset_index = find_asset_index(&borrow_global<AssetsOwned>(from_address).assets, asset_id);
-            let asset_index_unwrapped = Option::unwrap(asset_index);
-            
+            if (!exists<AssetsOwned>(from_address)) {
+                return Some(Error{code: 403}); // "Sender does not own any assets."
+            }
+
+            let asset_index_option = find_asset_index(&borrow_global<AssetsOwned>(from_address).assets, asset_id);
+            let asset_index = match asset_index_option {
+                Some(index) => index,
+                None => return Some(Error{code: 404}), // "Asset not found."
+            };
+
             let mut from_assets = borrow_global_mut<AssetsOwned>(from_address).assets;
-            let asset = Vector::remove(&mut from_assets, asset_index_unwrapped);
-            // Ensure the asset being transferred is owned by the sender
-            assert!(asset.owner == from_address, 403, "Unauthorized transfer attempt.");
+            let asset = Vector::remove(&mut from_assets, asset_index);
+
+            if asset.owner != from_address {
+                return Some(Error{code: 403}); // "Unauthorized transfer attempt."
+            }
 
             asset.owner = to; // Update the asset's owner to the new owner
 
-            if (!exists<AssetsOwned>(to)) {
+            if !exists<AssetsOwned>(to) {
                 let new_owned_assets = AssetsOwned { assets: Vector::empty() };
                 move_to(to, new_owned_assets);
             }
             add_asset_to_owner_by_address(to, asset);
+            None
         }
 
         public fun get_assets_owned_by(addr: address): vector<Asset> acquires AssetsOwned {
@@ -57,7 +70,7 @@ address 0x1 {
             let owner_addr = signer::address_of(owner);
             if (!exists<AssetsOwned>(owner_addr)) {
                 move_to(owner, AssetsOwned { assets: Vector::empty() });
-            };
+            }
             let owner_assets = borrow_global_mut<AssetsOwned>(owner_addr);
             Vector::push_back(&mut owner_assets.assets, asset);
         }
@@ -66,7 +79,7 @@ address 0x1 {
             if (!exists<AssetsOwned>(owner_addr)) {
                 let new_assets_owned = AssetsOwned { assets: Vector::empty() };
                 move_to(owner_addr, new_assets_owned);
-            };
+            }
             let owner_assets = borrow_global_mut<AssetsOwned>(owner_addr);
             Vector::push_back(&mut owner_assets.assets, asset);
         }
@@ -91,11 +104,11 @@ address 0x1 {
 
             while (index < len) {
                 if (Vector::borrow(assets, index).id == asset_id) {
-                    return Option::some(index);
+                    return Some(index);
                 };
                 index = index + 1;
             };
-            Option::none()
+            None
         }
     }
 }
