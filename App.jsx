@@ -22,6 +22,24 @@ const postAsset = async (asset) => {
   return response.json();
 };
 
+const editAsset = async (assetId, updatedAsset) => {
+  const response = await fetch(`${process.env.REACT_APP_API_URL}/assets/${assetId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updatedAsset),
+  });
+  if (!response.ok) throw new Error('Failed to edit asset');
+  return response.json();
+};
+
+const deleteAsset = async (assetId) => {
+  const response = await fetch(`${process.env.REACT_APP_API_URL}/assets/${assetId}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) throw new Error('Failed to delete asset');
+  return true; // Assuming deletion does not return a body
+};
+
 const postTransaction = async (transaction) => {
   const response = await fetch(`${process.env.REACT_APP_API_URL}/transactions`, {
     method: 'POST',
@@ -30,6 +48,14 @@ const postTransaction = async (transaction) => {
   });
   if (!response.ok) throw new Error('Failed to transfer asset');
   return response.json();
+};
+
+const deleteTransaction = async (transactionId) => {
+  const response = await fetch(`${process.env.REACT_APP_API_URL}/transactions/${transactionId}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) throw new Error('Failed to delete transaction');
+  return true; // Assuming deletion does not return a body
 };
 
 const App = () => {
@@ -53,8 +79,8 @@ const App = () => {
   }, []);
 
   const addAsset = async () => {
+    if (!newAsset) return; // Prevent adding empty assets
     const asset = {
-      id: assets.length + 1,
       name: newAsset,
     };
     try {
@@ -66,9 +92,40 @@ const App = () => {
     }
   };
 
+  const handleEditAsset = async (assetId) => {
+    const newName = prompt("Enter the new asset name:");
+    if (!newName) return;
+    try {
+      const updatedAsset = await editAsset(assetId, { name: newName });
+      setAssets(assets.map(asset => asset.id === assetId ? updatedAsset : asset));
+    } catch (error) {
+      console.error(`Error editing asset ${assetId}:`, error);
+    }
+  };
+
+  const handleDeleteAsset = async (assetId) => {
+    if (!window.confirm("Are you sure you want to delete this asset?")) return;
+    try {
+      await deleteAsset(assetId);
+      setAssets(assets.filter(asset => asset.id !== assetId));
+    } catch (error) {
+      console.error(`Error deleting asset ${assetId}:`, error);
+    }
+  };
+
+  const handleDeleteTransaction = async (transactionId) => {
+    if (!window.confirm("Are you sure you want to delete this transaction?")) return;
+    try {
+      await deleteTransaction(transactionId);
+      setTransactions(transactions.filter(transaction => transaction.id !== transactionId));
+    } catch (error) {
+      console.error(`Error deleting transaction ${transactionId}:`, error);
+    }
+  };
+
   const transferAsset = async () => {
+    if (!(transfer.from && transfer.to && transfer.assetId)) return; // Ensure all fields are filled
     const transaction = {
-      id: transactions.length + 1,
       from: transfer.from,
       to: transfer.to,
       assetId: transfer.assetId,
@@ -101,14 +158,21 @@ const App = () => {
       <h2>Assets</h2>
       <ul>
         {assets.map((asset) => (
-          <li key={asset.id}>{asset.name}</li>
+          <li key={asset.id}>
+            {asset.name} 
+            <button onClick={() => handleEditAsset(asset.id)}>Edit</button>
+            <button onClick={() => handleDeleteAsset(asset.id)}>Delete</button>
+          </li>
         ))}
       </ul>
 
       <h2>Transactions</h2>
       <ul>
         {transactions.map((transaction) => (
-          <li key={transaction.id}>{`Asset ID: ${transaction.assetId}, from: ${transaction.from}, to: ${transaction.to}, date: ${transaction.date}`}</li>
+          <li key={transaction.id}>
+            {`Asset ID: ${transaction.assetId}, from: ${transaction.from}, to: ${transaction.to}, date: ${transaction.date}`}
+            <button onClick={() => handleDeleteTransaction(transaction.id)}>Delete</button>
+          </li>
         ))}
       </ul>
     </div>
