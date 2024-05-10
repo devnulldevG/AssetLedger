@@ -2,55 +2,55 @@ import { ethers } from "ethers";
 import dotenv from "dotenv";
 dotenv.config();
 
-interface IToken {
-  createToken(name: string, symbol: string): Promise<void>;
-  transferToken(to: string, amount: number): Promise<void>;
-  getBalance(): Promise<number>;
+interface IAssetLedger {
+  mintAsset(name: string, symbol: string): Promise<void>;
+  transferAsset(toAddress: string, quantity: number): Promise<void>;
+  fetchBalance(): Promise<number>;
 }
 
-class BlockchainManager implements IToken {
-  private provider: ethers.providers.JsonRpcProvider;
-  private wallet: ethers.Wallet;
-  private contract: ethers.Contract;
+class EthBlockchainManager implements IAssetLedger {
+  private jsonRpcProvider: ethers.providers.JsonRpcProvider;
+  private blockchainWallet: ethers.Wallet;
+  private smartContract: ethers.Contract;
 
-  constructor(privateKey: string, rpcURL: string, contractAddress: string, contractABI: any) {
-    this.provider = new ethers.providers.JsonRpcProvider(rpcURL);
-    this.wallet = new ethers.Wallet(privateKey, this.provider);
-    this.contract = new ethers.Contract(contractAddress, contractABI, this.wallet);
+  constructor(walletPrivateKey: string, rpcEndpointURL: string, smartContractAddress: string, smartContractABI: any) {
+    this.jsonRpcProvider = new ethers.providers.JsonRpcProvider(rpcEndpointURL);
+    this.blockchainWallet = new ethers.Wallet(walletPrivateKey, this.jsonRpcProvider);
+    this.smartContract = new ethers.Contract(smartContractAddress, smartContractABI, this.blockchainWallet);
   }
 
-  async createToken(name: string, symbol: string): Promise<void> {
-    const tx = await this.contract.createToken(name, symbol);
-    await tx.wait();
-    console.log(`Token created: ${name} (${symbol})`);
+  async mintAsset(assetName: string, assetSymbol: string): Promise<void> {
+    const transaction = await this.smartContract.createToken(assetName, assetSymbol);
+    await transaction.wait();
+    console.log(`Asset minted: ${assetName} (${assetSymbol})`);
   }
 
-  async transferToken(to: string, amount: number): Promise<void> {
-    const tx = await this.contract.transfer(to, ethers.utils.parseUnits(amount.toString(), 18));
-    await tx.wait();
-    console.log(`Transferred ${amount} tokens to ${to}`);
+  async transferAsset(toAddress: string, quantity: number): Promise<void> {
+    const transaction = await this.smartContract.transfer(toAddress, ethers.utils.parseUnits(quantity.toString(), 18));
+    await transaction.wait();
+    console.log(`Transferred ${quantity} assets to ${toAddress}`);
   }
 
-  async getBalance(): Promise<number> {
-    const balance = await this.contract.balanceOf(this.wallet.address);
-    return ethers.utils.formatUnits(balance, 18);
+  async fetchBalance(): Promise<number> {
+    const balance = await this.smartContract.balanceOf(this.blockchainWallet.address);
+    return parseFloat(ethers.utils.formatUnits(balance, 18));
   }
 }
 
 async function main() {
-  const privateKey = process.env.PRIVATE_KEY || "";
-  const rpcURL = process.env.RPC_URL || "";
-  const contractAddress = process.env.CONTRACT_ADDRESS || "";
-  const contractABI = JSON.parse(process.env.CONTRACT_ABI || "[]");
+  const walletPrivateKey = process.env.PRIVATE_KEY || "";
+  const rpcEndpointURL = process.env.RPC_URL || "";
+  const smartContractAddress = process.env.CONTRACT_ADDRESS || "";
+  const smartContractABI = JSON.parse(process.env.CONTRACT_ABI || "[]");
 
-  const blockchainManager = new BlockchainManager(privateKey, rpcURL, contractAddress, contractABI);
+  const assetLedger = new EthBlockchainManager(walletPrivateKey, rpcEndpointURL, smartContractAddress, smartContractABI);
 
-  await blockchainManager.createToken("MyToken", "MTK");
-  await blockchainManager.transferToken("0x000...0001", 100);
-  const balance = await blockchainManager.getBalance();
-  console.log(`Current balance: ${balance} MTK`);
+  await assetLedger.mintAsset("GlobalToken", "GLT");
+  await assetLedger.transferAsset("0x000...0001", 100);
+  const walletBalance = await assetLedger.fetchBalance();
+  console.log(`Current wallet balance: ${walletBalance} GLT`);
 }
 
 main().catch((error) => {
-  console.error("Error occurred:", error);
+  console.error("Error occurred in Asset Ledger operations:", error);
 });
