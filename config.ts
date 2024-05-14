@@ -1,13 +1,14 @@
 import dotenv from 'dotenv';
-
 dotenv.config();
+
+interface OtherParameters {
+  [key: string]: string | undefined;
+}
 
 interface Config {
   blockchainEndpoint: string;
   apiAddress: string;
-  otherParameters: {
-    [key: string]: string | undefined;
-  };
+  otherParameters: OtherParameters;
 }
 
 class ConfigurationError extends Error {
@@ -29,9 +30,7 @@ const config: Config = {
   blockchainEndpoint: getMandatoryEnvVariable('BLOCKCHAIN_ENDPOINT'),
   apiAddress: getMandatoryEnvVariable('API_ADDRESS'),
   otherParameters: {
-    // Add any optional configurations here. For optional parameters you could
-    // use process.env.VARIABLE || 'defaultValue' without throwing an error
-  }
+  },
 };
 
 export default config;
