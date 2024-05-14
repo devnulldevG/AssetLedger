@@ -18,18 +18,35 @@ class EthBlockchainManager implements IAssetLedger {
   }
 
   async mintAsset(assetName: string, assetSymbol: string): Promise<void> {
-    await(this.smartContract.createToken(assetName, assetSymbol)).wait();
-    console.log(`Asset minted: ${assetName} (${assetSymbol})`);
+    try {
+      const transaction = await this.smartContract.createToken(assetName, assetSymbol);
+      await transaction.wait();
+      console.log(`Asset minted: ${assetName} (${assetSymbol})`);
+    } catch (error) {
+      console.error(`Failed to mint asset: ${assetName} (${assetSymbol}). Error:`, error);
+      throw error;
+    }
   }
 
   async transferAsset(toAddress: string, quantity: number): Promise<void> {
-    await(this.smartContract.transfer(toAddress, ethers.utils.parseUnits(quantity.toString(), 18))).wait();
-    console.log(`Transferred ${quantity} assets to ${toAddress}`);
+    try {
+      const transaction = await this.smartContract.transfer(toAddress, ethers.utils.parseUnits(quantity.toString(), 18));
+      await transaction.wait();
+      console.log(`Transferred ${quantity} assets to ${toAddress}`);
+    } catch (error) {
+      console.error(`Failed to transfer ${quantity} assets to ${toAddress}. Error:`, error);
+      throw error;
+    }
   }
 
   async fetchBalance(): Promise<number> {
-    const balance = await this.smartContract.balanceOf(await this.smartContract.signer.getAddress());
-    return parseFloat(ethers.utils.formatUnits(balance, 18));
+    try {
+      const balance = await this.smartContract.balanceOf(await this.smartContract.signer.getAddress());
+      return parseFloat(ethers.utils.formatUnits(balance, 18));
+    } catch (error) {
+      console.error("Failed to fetch balance. Error:", error);
+      throw error;
+    }
   }
 }
 
@@ -42,12 +59,27 @@ async function main() {
 
     const assetLedger = new EthBlockchainManager(walletPrivateKey, rpcEndpointURL, smartContractAddress, smartContractABI);
 
-    await assetLedger.mintAsset("GlobalToken", "GLT");
-    await assetLedger.transferAsset("0x000...0001", 100);
-    const walletBalance = await assetLedger.fetchBalance();
-    console.log(`Current wallet balance: ${walletBalance} GLT`);
+    try {
+      await assetLedger.mintAsset("GlobalToken", "GLT");
+    } catch (mintError) {
+      // Handle mintAsset specific error
+    }
+    
+    try {
+      await assetLedger.transferAsset("0x000...0001", 100);
+    } catch (transferError) {
+      // Handle transferAsset specific error
+    }
+
+    try {
+      const walletBalance = await assetLedger.fetchBalance();
+      console.log(`Current wallet balance: ${walletBalance} GLT`);
+    } catch (balanceError) {
+      // Handle fetchBalance specific error
+    }
+
   } catch (error) {
-    console.error("Error occurred in Asset Ledger operations:", error);
+    console.error("An unexpected error occurred in the Asset Ledger operations:", error);
   }
 }
 
