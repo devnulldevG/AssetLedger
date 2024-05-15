@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 interface OtherParameters {
-  [key: string]: string | undefined;
+  [key: string]: any;
 }
 
 interface Config {
@@ -26,11 +26,37 @@ const getMandatoryEnvVariable = (varName: string): string => {
   return value;
 };
 
+const validateURL = (url: string): void => {
+  try {
+    new URL(url);
+  } catch (_) {
+    throw new ConfigurationError(`${url} is not a valid URL.`);
+  }
+}
+
+const loadOtherParameters = (): OtherParameters => {
+  const reservedKeys = ['BLOCKCHAIN_ENDPOINT', 'API_ADDRESS'];
+  return Object.keys(process.env)
+    .filter(key => !reservedKeys.includes(key))
+    .reduce((obj, key) => {
+      if (key && process.env[key]) {
+        obj[key] = process.env[key];
+      }
+      return obj;
+    }, <OtherParameters>{});
+};
+
+const validateConfig = (config: Config): void => {
+  validateURL(config.blockchainEndpoint);
+  validateURL(config.apiAddress);
+}
+
 const config: Config = {
   blockchainEndpoint: getMandatoryEnvVariable('BLOCKCHAIN_ENDPOINT'),
   apiAddress: getMandatoryEnvVariable('API_ADDRESS'),
-  otherParameters: {
-  },
+  otherParameters: loadOtherParameters(),
 };
+
+validateConfig(config);
 
 export default config;
