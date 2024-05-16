@@ -9,6 +9,7 @@ const app = express();
 app.use(express.json());
 
 const registeredUsers = new Map<string, string>();
+const refreshTokens = new Set<string>();
 
 function verifyAuthToken(req: any, res: any, next: any) {
     const authToken = req.headers['authorization'];
@@ -20,6 +21,10 @@ function verifyAuthToken(req: any, res: any, next: any) {
         req.user = user;
         next();
     });
+}
+
+function generateAccessToken(user: any) {
+    return jwt.sign(user, process.env.ACCESS_TOKEN_SECRET!, { expiresIn: '1h' });
 }
 
 async function createPasswordHash(password: string): Promise<string> {
@@ -50,14 +55,33 @@ app.post('/login', async (req, res) => {
         const { username, password } = req.body;
         const hashedPasswordForUser = registeredUsers.get(username);
         if (hashedPasswordForUser && await checkPassword(password, hashedPasswordForUser)) {
-            const accessToken = jwt.sign({ username }, process.env.ACCESS_TOKEN_SECRET!, { expiresIn: '1h' });
-            res.json({ accessToken });
+            const user = { username };
+            const accessToken = generateAccessToken(user);
+            const refreshToken = jwt.sign(user, process.env.REFRESH_TOKEN_SECRET!);
+            refreshTokens.add(refreshToken);
+            res.json({ accessToken, refreshToken });
         } else {
             res.status(400).send('Invalid username or password');
         }
     } catch (error) {
         res.status(500).send('Server error during login');
     }
+});
+
+app.post('/token', (req, res) => {
+    const refreshToken = req.body.token;
+    if (refreshToken == null) return res.sendStatus(401);
+    if (!refreshTokens.has(refreshToken)) return res.sendStatus(403);
+    jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET!, (err, user) => {
+        if (err) return res.sendStatus(403);
+        const accessToken = generateAccessToken({ username: user.username });
+        res.json({ accessToken });
+    });
+});
+
+app.delete('/logout', (req, res) => {
+    refreshTokens.delete(req.body.token);
+    res.sendStatus(204);
 });
 
 app.get('/protected', verifyAuthToken, (req, res) => {
