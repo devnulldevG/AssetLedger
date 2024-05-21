@@ -8,30 +8,30 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 
-const registeredUsers = new Map<string, string>();
-const refreshTokens = new Set<string>();
+const userCredentials = new Map<string, string>();
+const activeRefreshTokens = new Set<string>();
 
-function verifyAuthToken(req: any, res: any, next: any) {
-    const authToken = req.headers['authorization'];
-    const token = authToken && authToken.split(' ')[1];
-    if (token == null) return res.sendStatus(401);
+function authenticateRequest(req: any, res: any, next: any) {
+    const authHeader = req.headers['authorization'];
+    const authToken = authHeader && authHeader.split(' ')[1];
+    if (authToken == null) return res.sendStatus(401);
 
-    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET!, (err: any, user: any) => {
+    jwt.verify(authToken, process.env.ACCESS_TOKEN_SECRET!, (err: any, userInfo: any) => {
         if (err) return res.status(403).send('Access token is invalid or has expired');
-        req.user = user;
+        req.user = userInfo;
         next();
     });
 }
 
-function generateAccessToken(user: any) {
+function createAccessToken(userInfo: any) {
     try {
-        return jwt.sign(user, process.env.ACCESS_TOKEN_SECRET!, { expiresIn: '1h' });    
+        return jwt.sign(userInfo, process.env.ACCESS_TOKEN_SECRET!, { expiresIn: '1h' });    
     } catch (error) {
         throw new Error('Failed to generate access token');
     }
 }
 
-async function createPasswordHash(password: string): Promise<string> {
+async function hashUserPassword(password: string): Promise<string> {
     const saltRounds = 10;
     try {
         return await bcrypt.hash(password, saltRounds);
@@ -40,7 +40,7 @@ async function createPasswordHash(password: string): Promise<string> {
     }
 }
 
-async function checkPassword(password: string, hashedPassword: string): Promise<boolean> {
+async function verifyUserPassword(password: string, hashedPassword: string): Promise<boolean> {
     try {
         return await bcrypt.compare(password, hashedPassword);
     } catch (error) {
@@ -54,11 +54,11 @@ app.post('/register', async (req, res) => {
         if (!username || !password) {
             return res.status(400).send('Username and password are required');
         }
-        if (registeredUsers.has(username)) {
+        if (userCredentials.has(username)) {
             return res.status(400).send('User already exists');
         }
-        const hashedPassword = await createPasswordHash(password);
-        registeredUsers.set(username, hashedPassword);
+        const hashedPassword = await hashUserPassword(password);
+        userCredentials.set(username, hashedPassword);
         res.status(201).send('User registered successfully');
     } catch (error) {
         res.status(500).send(`Server error during registration: ${error.message}`);
@@ -68,12 +68,12 @@ app.post('/register', async (req, res) => {
 app.post('/login', async (req, res) => {
     try {
         const { username, password } = req.body;
-        const hashedPasswordForUser = registeredUsers.get(username);
-        if (hashedPasswordForUser && await checkPassword(password, hashedPasswordForUser)) {
-            const user = { username };
-            const accessToken = generateAccessToken(user);
-            const refreshToken = jwt.sign(user, process.env.REFRESH_TOKEN_SECRET!);
-            refreshTokens.add(refreshToken);
+        const hashedPassword = userCredentials.get(username);
+        if (hashedPassword && await verifyUserPassword(password, hashedPassword)) {
+            const userInfo = { username };
+            const accessToken = createAccessToken(userInfo);
+            const refreshToken = jwt.sign(userInfo, process.env.REFRESH_TOKEN_SECRET!);
+            activeRefreshTokens.add(refreshToken);
             res.json({ accessToken, refreshToken });
         } else {
             res.status(400).send('Invalid username or password');
@@ -86,12 +86,12 @@ app.post('/login', async (req, res) => {
 app.post('/token', (req, res) => {
     const refreshToken = req.body.token;
     if (refreshToken == null) return res.sendStatus(401);
-    if (!refreshTokens.has(refreshToken)) return res.sendStatus(403);
+    if (!activeRefreshTokens.has(refreshToken)) return res.sendStatus(403);
 
-    jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET!, (err, user) => {
+    jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET!, (err, userInfo) => {
         if (err) return res.status(403).send('Refresh token is invalid or has expired');
 
-        const accessToken = generateAccessToken({ username: user.username });
+        const accessToken = createAccessToken({ username: userInfo.username });
         res.json({ accessToken });
     });
 });
@@ -102,15 +102,15 @@ app.delete('/logout', (req, res) => {
         return res.status(400).send('Token is required for logout');
     }
     
-    const deleted = refreshTokens.delete(refreshToken);
-    if (deleted) {
+    const removed = activeRefreshTokens.delete(refreshToken);
+    if (removed) {
         res.sendStatus(204);
     } else {
         res.status(400).send('Invalid or unknown token');
     }
 });
 
-app.get('/protected', verifyAuthToken, (req, res) => {
+app.get('/protected', authenticateRequest, (req, res) => {
     res.send(`Welcome! Your user information is protected.`);
 });
 
